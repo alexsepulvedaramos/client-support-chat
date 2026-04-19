@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useParams } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Download, ThumbsUp, ThumbsDown, Send } from 'lucide-react';
-import { getClientMessages } from '@/fake/fake-data';
+import { getClientMessages, sendMessage } from '@/fake/fake-data';
+import { Message } from '../interfaces/chat.interface';
 
 export default function ChatPage() {
   const { clientId } = useParams();
-
+  const queryClient = useQueryClient();
   const [input, setInput] = useState('');
 
   const { data: messages = [], isLoading } = useQuery({
@@ -18,6 +19,33 @@ export default function ChatPage() {
     queryFn: () => getClientMessages(clientId ?? ''),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { mutate: sendMessageMutation } = useMutation({
+    mutationFn: sendMessage,
+    onSuccess: (newMessage) => {
+      queryClient.setQueryData(
+        ['messages', clientId],
+        (oldMessages: Message[]) => [...oldMessages, newMessage],
+      );
+    },
+  });
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!input.trim()) {
+      return;
+    }
+
+    sendMessageMutation({
+      content: input,
+      clientId: clientId ?? '',
+      createdAt: new Date(),
+      sender: 'agent',
+    });
+
+    setInput('');
+  };
 
   if (isLoading) {
     return (
@@ -36,8 +64,8 @@ export default function ChatPage() {
         <div className="space-y-4">
           {messages.map((message, index) => (
             <div key={index} className="w-full">
-              {message.sender === 'agent' ? (
-                // Agent message - left aligned
+              {message.sender === 'client' ? (
+                // Client message - left aligned
                 <div className="flex gap-2 max-w-[80%]">
                   <div className="h-8 w-8 rounded-full bg-primary flex-shrink-0" />
                   <div className="space-y-2">
@@ -94,23 +122,28 @@ export default function ChatPage() {
           <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
             <Send className="h-6 w-6 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
+          <p className="text-muted-foreground">
+            No messages yet. Start the conversation!
+          </p>
         </div>
       )}
 
       <div className="p-4 border-t">
-        <div className="flex items-center gap-2">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <Textarea
             placeholder="Type a message as a customer"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             className="min-h-[44px] h-[44px] resize-none py-3"
           />
-          <Button className="h-[44px] px-4 flex items-center gap-2">
+          <Button
+            type="submit"
+            className="h-[44px] px-4 flex items-center gap-2"
+          >
             <Send className="h-4 w-4" />
             <span>Send</span>
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );

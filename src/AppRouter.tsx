@@ -5,6 +5,9 @@ import { LoginPage } from './auth/pages/LoginPage';
 import { RegisterPage } from './auth/pages/RegisterPage';
 import { sleep } from './lib/sleep';
 import Spinner from './components/ui/spinner';
+import PrivateRoute from './auth/components/PrivateRoute';
+import { useQuery } from '@tanstack/react-query';
+import { checkAuth } from './fake/fake-data';
 
 // import ChatLayout from './chat/layout/ChatLayout';
 const ChatLayout = lazy(async () => {
@@ -17,6 +20,33 @@ const NoChatSelectedPage = lazy(
 );
 
 export const AppRouter = () => {
+  const {
+    data: user,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => {
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        throw new Error('No token found');
+      }
+
+      return checkAuth(token);
+    },
+    retry: 0,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -31,7 +61,9 @@ export const AppRouter = () => {
           path="/chat"
           element={
             <Suspense fallback={<Spinner />}>
-              <ChatLayout />
+              <PrivateRoute isAuthenticated={!!user}>
+                <ChatLayout />
+              </PrivateRoute>
             </Suspense>
           }
         >

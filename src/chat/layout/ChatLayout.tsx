@@ -1,11 +1,31 @@
-import { Link, Outlet } from 'react-router';
+import { Link, Outlet, useNavigate } from 'react-router';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 import ContactList from '../components/ContactList';
 import ContactDetails from '../components/contact-details/ContactDetails';
+import { checkAuth } from '@/fake/fake-data';
 
 export default function ChatLayout() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const onLogout = () => {
+    localStorage.removeItem('token');
+    queryClient.invalidateQueries({ queryKey: ['user'] });
+    navigate('/auth', { replace: true });
+  };
+
+  const { data: user } = useQuery({
+    queryKey: ['user'],
+    queryFn: () => {
+      const token = localStorage.getItem('token');
+
+      return checkAuth(token ?? '');
+    },
+  });
+
   return (
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
@@ -14,11 +34,23 @@ export default function ChatLayout() {
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-full bg-primary" />
             <Link to="/chat">
-              <span className="font-semibold">NexTalk</span>
+              <span className="font-semibold">{user?.name ?? '...'}</span>
             </Link>
           </div>
         </div>
         <ContactList />
+
+        <div className="p-4 border-t">
+          <Button
+            onClick={onLogout}
+            variant="ghost"
+            size="sm"
+            className="w-full cursor-pointer"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Logout
+          </Button>
+        </div>
       </div>
 
       {/* Main Content */}
